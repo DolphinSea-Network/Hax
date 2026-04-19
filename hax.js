@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PC+移动端通用 | Hax&Woiden双站抢机工具
 // @namespace    http://tampermonkey.net/
-// @version      1.0Max
+// @version      1.1Max
 // @description  悬浮球菜单，自动填表+全勾协议+自动刷新
 // @author       Doubao
 // @author       Qwen
@@ -252,21 +252,29 @@
         document.body.appendChild(ballElement);
 
         // 注入面板 - 带分类标签
+        // 根据当前页面确定默认标签页
+        const currentPath = window.location.pathname;
+        let defaultTab = 'create';
+        if (currentPath.includes('vps-control')) defaultTab = 'control';
+        else if (currentPath.includes('vps-info')) defaultTab = 'info';
+        else if (currentPath.includes('vps-renew')) defaultTab = 'renew';
+        else if (currentPath.includes('remove-vps')) defaultTab = 'remove';
+
         let panelHTML = `<div class="hw-title">${currentMeta.name} 抢机工具</div>`;
-        
+
         // 标签页导航
         panelHTML += `
             <div class="hw-tabs">
-                <button class="hw-tab active" data-tab="create">Create</button>
-                <button class="hw-tab" data-tab="power">Power</button>
-                <button class="hw-tab" data-tab="info">Info</button>
-                <button class="hw-tab" data-tab="renew">Renew</button>
-                <button class="hw-tab" data-tab="remove">Remove</button>
+                <button class="hw-tab ${defaultTab === 'create' ? 'active' : ''}" data-tab="create">Create</button>
+                <button class="hw-tab ${defaultTab === 'control' ? 'active' : ''}" data-tab="control">Control</button>
+                <button class="hw-tab ${defaultTab === 'info' ? 'active' : ''}" data-tab="info">Info</button>
+                <button class="hw-tab ${defaultTab === 'renew' ? 'active' : ''}" data-tab="renew">Renew</button>
+                <button class="hw-tab ${defaultTab === 'remove' ? 'active' : ''}" data-tab="remove">Remove</button>
             </div>
         `;
-        
+
         // Create 标签页内容
-        panelHTML += `<div class="hw-tab-content active" id="hw-tab-create">`;
+        panelHTML += `<div class="hw-tab-content ${defaultTab === 'create' ? 'active' : ''}" id="hw-tab-create">`;
         panelHTML += `
             <div class="hw-item">
                 <label class="hw-label">数据中心/区域</label>
@@ -293,19 +301,29 @@
             <button class="hw-apply-btn" id="hw-apply">✅ 应用配置</button>
             <div class="hw-tip" id="hw-tip">自动刷新已关闭</div>
         </div>`;
-        
-        // Power 标签页（预留）
-        panelHTML += `<div class="hw-tab-content" id="hw-tab-power">
-            <div class="hw-tip">Power 功能开发中...</div>
+
+        // Control 标签页
+        panelHTML += `<div class="hw-tab-content ${defaultTab === 'control' ? 'active' : ''}" id="hw-tab-control">
+            <div class="hw-item">
+                <label class="hw-label">电源操作</label>
+                <select class="hw-select" id="hw-control-action">
+                    <option value="start">▶️ Start</option>
+                    <option value="stop">⏹️ Stop</option>
+                    <option value="restart">🔄 Restart</option>
+                    <option value="enabletun">🔧 Enable TUN</option>
+                </select>
+            </div>
+            <button class="hw-apply-btn" id="hw-control-apply" style="background: #ff9800 !important;">⚡ 执行操作</button>
+            <div class="hw-tip" id="hw-control-tip">等待操作</div>
         </div>`;
-        
+
         // Info 标签页（预留）
-        panelHTML += `<div class="hw-tab-content" id="hw-tab-info">
+        panelHTML += `<div class="hw-tab-content ${defaultTab === 'info' ? 'active' : ''}" id="hw-tab-info">
             <div class="hw-tip">Info 功能开发中...</div>
         </div>`;
-        
+
         // Renew 标签页
-        panelHTML += `<div class="hw-tab-content" id="hw-tab-renew">
+        panelHTML += `<div class="hw-tab-content ${defaultTab === 'renew' ? 'active' : ''}" id="hw-tab-renew">
             <div class="hw-item">
                 <label class="hw-label">网站地址</label>
                 <input type="text" class="hw-input" id="hw-renew-web" value="${CURRENT_SITE === 'hax' ? 'hax.co.id' : 'woiden.id'}" placeholder="hax.co.id">
@@ -313,9 +331,9 @@
             <button class="hw-apply-btn" id="hw-renew-apply" style="background: #9c27b0 !important;">🔄 自动续期VPS</button>
             <div class="hw-tip" id="hw-renew-tip">等待操作</div>
         </div>`;
-        
+
         // Remove 标签页
-        panelHTML += `<div class="hw-tab-content" id="hw-tab-remove">
+        panelHTML += `<div class="hw-tab-content ${defaultTab === 'remove' ? 'active' : ''}" id="hw-tab-remove">
             <div class="hw-item">
                 <label class="hw-label">确认删除</label>
                 <input type="text" class="hw-input" id="hw-remove-confirm" value="AGREE" readonly>
@@ -333,7 +351,7 @@
         bindDragEvents();
         bindClickEvents();
         bindTabEvents();
-        
+
         // Woiden 数学题后台自动计算
         if (CURRENT_SITE === 'woiden') {
             monitorWoidenCaptcha();
@@ -491,7 +509,16 @@
             fillForm();
             startRefreshTimer();
         });
-        
+
+        // Control VPS 按钮
+        const controlBtn = document.querySelector('#hw-control-apply');
+        if (controlBtn) {
+            controlBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleControlVPS();
+            });
+        }
+
         // Renew VPS 按钮
         const renewBtn = document.querySelector('#hw-renew-apply');
         if (renewBtn) {
@@ -500,7 +527,7 @@
                 handleRenewVPS();
             });
         }
-        
+
         // Remove VPS 按钮
         const removeBtn = document.querySelector('#hw-remove-apply');
         if (removeBtn) {
@@ -510,61 +537,61 @@
             });
         }
     }
-    
+
     // ====================== 6.1 标签页切换事件 ======================
     function bindTabEvents() {
         const pageRoutes = {
             create: '/create-vps/',
-            power: '/vps-control/',
+            control: '/vps-control/',
             info: '/vps-info/',
             renew: '/vps-renew/',
             remove: '/remove-vps/'
         };
-        
+
         document.querySelectorAll('.hw-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const tabName = e.target.dataset.tab;
-                
+
                 // 切换标签激活状态
                 document.querySelectorAll('.hw-tab').forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
-                
+
                 // 切换内容显示
                 document.querySelectorAll('.hw-tab-content').forEach(c => c.classList.remove('active'));
                 document.querySelector(`#hw-tab-${tabName}`).classList.add('active');
-                
+
                 // 检查当前页面是否匹配，不匹配则跳转
                 const currentPath = window.location.pathname;
                 const targetPath = pageRoutes[tabName];
-                
+
                 if (targetPath && !currentPath.includes(targetPath.replace(/\//g, ''))) {
                     window.location.href = targetPath;
                 }
             });
         });
     }
-    
+
     // ====================== 6.2 Woiden 数学题后台自动计算 ======================
     function monitorWoidenCaptcha() {
         let captchaMonitor = null;
         let lastCaptchaSrc = '';
-        
+
         function checkCaptcha() {
             const captchaRow = document.querySelector('.form-group.row');
             if (!captchaRow) return;
-            
+
             const imgElements = captchaRow.querySelectorAll('img');
             if (imgElements.length < 2) return;
-            
+
             const currentSrc = imgElements[0]?.src || '';
             if (currentSrc && currentSrc !== lastCaptchaSrc) {
                 lastCaptchaSrc = currentSrc;
-                
+
                 const num1 = extractNumberFromUrl(imgElements[0].src);
                 const num2 = extractNumberFromUrl(imgElements[1].src);
                 const operator = extractOperator(captchaRow);
-                
+
                 if (num1 !== null && num2 !== null && operator) {
                     const answer = calculateAnswer(num1, num2, operator);
                     if (answer !== null) {
@@ -573,14 +600,14 @@
                 }
             }
         }
-        
+
         captchaMonitor = setInterval(checkCaptcha, 500);
-        
+
         setTimeout(() => {
             if (captchaMonitor) clearInterval(captchaMonitor);
         }, 30000);
     }
-    
+
     function extractNumberFromUrl(url) {
         const match = url.match(/-(\d)\d+\.\d+\.\d+\.\d+\.jpg/);
         if (match) {
@@ -588,14 +615,14 @@
         }
         return null;
     }
-    
+
     function extractOperator(container) {
         const imgElements = container.querySelectorAll('img');
         if (imgElements.length < 2) return null;
-        
+
         const firstImg = imgElements[0];
         let nextNode = firstImg.nextSibling;
-        
+
         while (nextNode) {
             if (nextNode.nodeType === Node.TEXT_NODE) {
                 const text = nextNode.textContent.trim();
@@ -609,10 +636,10 @@
             }
             nextNode = nextNode.nextSibling;
         }
-        
+
         return '×';
     }
-    
+
     function calculateAnswer(num1, num2, operator) {
         switch (operator) {
             case '+':
@@ -631,7 +658,7 @@
                 return null;
         }
     }
-    
+
     function syncCaptchaToPage(answer) {
         const pageCaptchaInput = document.querySelector('#captcha');
         if (pageCaptchaInput && answer) {
@@ -703,7 +730,7 @@
 
             showTip("✅ 配置已应用：区域+OS+密码+全勾选协议");
             fillRetryCount = 0;
-            
+
             // 自动启动 Cloudflare 检测并点击 CREATE VPS
             setTimeout(() => {
                 const createVPSBtn = document.querySelector('button[name="submit_button"]');
@@ -720,7 +747,7 @@
     // ====================== 8. CREATE VPS 辅助点击 + Cloudflare 自动检测 ======================
     function handleCreateVPSClick() {
         const createVPSBtn = document.querySelector('button[name="submit_button"]');
-        
+
         if (!createVPSBtn) {
             showTip("❌ 未找到 CREATE VPS 按钮");
             return;
@@ -772,20 +799,20 @@
 
     function checkCloudflareChallenge() {
         const turnstileWidget = document.querySelector('.cf-turnstile');
-        
+
         if (!turnstileWidget) {
             return 'not_found';
         }
 
         const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
         const cfIframe = document.querySelector('iframe[src*="challenges.cloudflare.com"]');
-        
+
         if (turnstileResponse && turnstileResponse.value && turnstileResponse.value.length > 0) {
             return 'success';
         }
 
         if (cfIframe && cfIframe.offsetHeight > 0) {
-            if (turnstileWidget.classList.contains('success') || 
+            if (turnstileWidget.classList.contains('success') ||
                 turnstileWidget.querySelector('.success')) {
                 return 'success';
             }
@@ -805,10 +832,10 @@
                     clientX: createVPSBtn.getBoundingClientRect().x + 10,
                     clientY: createVPSBtn.getBoundingClientRect().y + 10
                 });
-                
+
                 createVPSBtn.dispatchEvent(clickEvent);
                 showTip("🚀 已发送创建VPS请求");
-                
+
                 setTimeout(() => {
                     showTip("✅ VPS创建请求已提交");
                 }, 1000);
@@ -897,10 +924,10 @@
                     clientX: renewBtn.getBoundingClientRect().x + 10,
                     clientY: renewBtn.getBoundingClientRect().y + 10
                 });
-                
+
                 renewBtn.dispatchEvent(clickEvent);
                 showRenewTip("� 已发送续期请求");
-                
+
                 setTimeout(() => {
                     showRenewTip("✅ VPS续期请求已提交");
                 }, 1000);
@@ -996,10 +1023,10 @@
                     clientX: removeBtn.getBoundingClientRect().x + 10,
                     clientY: removeBtn.getBoundingClientRect().y + 10
                 });
-                
+
                 removeBtn.dispatchEvent(clickEvent);
                 showRemoveTip("🗑️ 已发送删除请求");
-                
+
                 setTimeout(() => {
                     showRemoveTip("⚠️ VPS删除请求已提交，数据将被清除");
                 }, 1000);
@@ -1012,6 +1039,91 @@
 
     function showRemoveTip(text) {
         const tipEl = document.querySelector('#hw-remove-tip');
+        if (tipEl) {
+            tipEl.textContent = text;
+        }
+    }
+
+    // ====================== 11. Control VPS 功能 ======================
+    function handleControlVPS() {
+        const action = document.querySelector('#hw-control-action')?.value;
+        if (!action) {
+            showControlTip("❌ 请选择操作");
+            return;
+        }
+
+        const targetBtn = document.querySelector(`button[name="submit_button"][value="${action}"]`);
+        if (!targetBtn) {
+            showControlTip("❌ 未找到对应按钮，请确认页面已加载");
+            return;
+        }
+
+        showControlTip("✅ 等待 Cloudflare 验证...");
+
+        startControlMonitor(targetBtn, action);
+    }
+
+    function startControlMonitor(targetBtn, action) {
+        let monitorCount = 0;
+        const maxMonitor = 240;
+        let hasNotifiedPending = false;
+
+        const monitorInterval = setInterval(() => {
+            monitorCount++;
+            const cfStatus = checkCloudflareChallenge();
+
+            if (cfStatus === 'loading') {
+                if (monitorCount % 10 === 0) {
+                    showControlTip("⏳ Cloudflare 验证加载中...");
+                }
+            } else if (cfStatus === 'pending') {
+                if (!hasNotifiedPending) {
+                    showControlTip("⚠️ 请完成 Cloudflare 人机验证");
+                    hasNotifiedPending = true;
+                }
+            } else if (cfStatus === 'success') {
+                clearInterval(monitorInterval);
+                showControlTip(`⚡ 验证通过，正在执行 ${action.toUpperCase()}...`);
+                triggerControlVPS(targetBtn, action);
+            } else if (cfStatus === 'not_found') {
+                clearInterval(monitorInterval);
+                showControlTip(`⚡ 无需验证，直接执行 ${action.toUpperCase()}...`);
+                triggerControlVPS(targetBtn, action);
+            }
+
+            if (monitorCount >= maxMonitor) {
+                clearInterval(monitorInterval);
+                showControlTip("⏱ 监控超时，请手动点击对应按钮");
+            }
+        }, 500);
+    }
+
+    function triggerControlVPS(targetBtn, action) {
+        requestAnimationFrame(() => {
+            try {
+                const clickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: targetBtn.getBoundingClientRect().x + 10,
+                    clientY: targetBtn.getBoundingClientRect().y + 10
+                });
+
+                targetBtn.dispatchEvent(clickEvent);
+                showControlTip(`✅ 已发送 ${action.toUpperCase()} 请求`);
+
+                setTimeout(() => {
+                    showControlTip(`✅ ${action.toUpperCase()} 请求已提交`);
+                }, 1000);
+            } catch (e) {
+                showControlTip("❌ 操作失败");
+                console.error("Control VPS 点击错误：", e);
+            }
+        });
+    }
+
+    function showControlTip(text) {
+        const tipEl = document.querySelector('#hw-control-tip');
         if (tipEl) {
             tipEl.textContent = text;
         }
@@ -1082,7 +1194,8 @@
             // 页面加载完成自动填表
             setTimeout(() => {
                 fillForm();
-                if (currentConfig.refreshEnable) {
+                // 自动刷新仅在 create-vps 页面生效
+                if (currentConfig.refreshEnable && window.location.pathname.includes('create-vps')) {
                     startRefreshTimer();
                 }
                 // Create 页面自动创建VPS
